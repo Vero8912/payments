@@ -20,12 +20,13 @@ def iniciar_navegador():
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--window-size=1920,1080")
     
-    # IMPORTANTE: En Streamlit Cloud, Chromium se instala en esta ruta:
+    # User-Agent para evitar ser detectado como bot
+    chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36")
+    
+    # Rutas binarias de Streamlit Cloud
     chrome_options.binary_location = "/usr/bin/chromium"
-    
-    # No usamos Service(ChromeDriverManager().install())
-    # Usamos directamente el ejecutable del driver del sistema
     service = Service("/usr/bin/chromedriver")
     
     driver = webdriver.Chrome(service=service, options=chrome_options)
@@ -198,19 +199,19 @@ def manejar_error_dialog(driver):
 
 
 # --- INTERFAZ DE STREAMLIT ---
-st.set_page_config(page_title="Notas Pagos", page_icon="🤖")
-st.title("🤖 Notas de pagos Tourplan")
+st.set_page_config(page_title="Tourplan Automator", page_icon="🏢", layout="wide")
+st.title("🏢 Tourplan Automation Web")
 
 with st.sidebar:
-    st.header("🔑 Credenciales de Tourplan")
+    st.header("🔐 Credenciales")
     user_input = st.text_input("Usuario")
     pass_input = st.text_input("Contraseña", type="password")
-    
     st.divider()
-    st.info("Este script procesa bookings en Tourplan de forma automatizada.")
+    st.header("📋 Configuración Excel")
+    nombre_pestana = st.text_input("Nombre de la pestaña", value="Sheet1")
+    st.info("Asegúrate de que el Excel tenga las columnas: REFERENCIA, FECHA, IMPORTE")
 
-archivo_excel = st.file_uploader("📂 Subir archivo Excel", type=["xlsx", "xls", "xlsm"])
-nombre_pestana = st.text_input("Nombre de la pestaña", value="Hoja1")
+archivo_excel = st.file_uploader("📂 Sube tu archivo Excel", type=["xlsx", "xls", "xlsm"])
 
 if st.button("🚀 Iniciar Proceso"):
     if not user_input or not pass_input or not archivo_excel:

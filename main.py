@@ -16,12 +16,18 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 # --- CONFIGURACIÓN DE SELENIUM PARA LA NUBE ---
 def iniciar_navegador():
     chrome_options = Options()
-    chrome_options.add_argument("--headless")  # Modo sin ventana (obligatorio)
+    chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--window-size=1920,1080")
+    chrome_options.add_argument("--disable-gpu")
     
-    service = Service(ChromeDriverManager().install())
+    # IMPORTANTE: En Streamlit Cloud, Chromium se instala en esta ruta:
+    chrome_options.binary_location = "/usr/bin/chromium"
+    
+    # No usamos Service(ChromeDriverManager().install())
+    # Usamos directamente el ejecutable del driver del sistema
+    service = Service("/usr/bin/chromedriver")
+    
     driver = webdriver.Chrome(service=service, options=chrome_options)
     return driver
 

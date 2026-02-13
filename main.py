@@ -43,8 +43,8 @@ with st.sidebar:
     st.divider()
     st.info("Este script procesa bookings en Tourplan de forma automatizada.")
 
-archivo_excel = st.file_uploader("📂 Sube tu archivo Excel", type=["xlsx", "xls", "xlsm"])
-nombre_pestana = st.text_input("Nombre de la pestaña", value="Sheet1")
+archivo_excel = st.file_uploader("📂 Subir archivo Excel", type=["xlsx", "xls", "xlsm"])
+nombre_pestana = st.text_input("Nombre de la pestaña", value="Hoja1")
 
 if st.button("🚀 Iniciar Proceso"):
     if not user_input or not pass_input or not archivo_excel:

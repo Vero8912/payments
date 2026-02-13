@@ -215,125 +215,154 @@ archivo_excel = st.file_uploader("📂 Sube tu archivo Excel", type=["xlsx", "xl
 
 if st.button("🚀 Iniciar Proceso"):
     if not user_input or not pass_input or not archivo_excel:
-        st.error("Faltan datos (Usuario, Contraseña o Excel).")
+        st.warning("Faltan datos obligatorios (Credenciales o archivo).")
     else:
         try:
-            # 1. Cargar Excel
+            # 1. Leer Excel
             df = pd.read_excel(archivo_excel, sheet_name=nombre_pestana)
-            st.success(f"Archivo cargado. {len(df)} filas detectadas.")
+            st.success(f"Excel cargado correctamente: {len(df)} filas.")
             
-            # 2. Inicializar Navegador
-            with st.status("Conectando con Tourplan...", expanded=True) as status:
+            reporte_final = []
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+
+            with st.status("Ejecutando robot...", expanded=True) as status:
+                status.write("🌐 Iniciando navegador invisible...")
                 driver = iniciar_navegador()
-                wait = WebDriverWait(driver, 15)
+                wait = WebDriverWait(driver, 20) # Espera generosa para la nube
                 
-                # --- LOGIN ---
-                status.write("Realizando login...")
-                driver.get('https://la-atpdmc.nx.tourplan.net/TourplanNX_test/#/home')
+                # --- PASO 1: LOGIN ---
+                status.write("🔗 Accediendo a Tourplan...")
+                driver.get('https://la-atpdmc.nx.tourplan.net/TourplanNX/#/home')
                 
-                wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'username'))).send_keys(user_input)
-                driver.find_element(By.CLASS_NAME, 'password').send_keys(pass_input)
-                driver.find_element(By.XPATH, '//button[contains(text(), "Login") or @type="submit"]').click()
-                
-                # Esperar entrada al home
-                time.sleep(5) 
-                
-                # --- BUCLE DE PROCESAMIENTO ---
-                progress_bar = st.progress(0)
-                
+                try:
+                    status.write("🔑 Introduciendo credenciales...")
+                    # Esperar a que el campo de usuario sea visible
+                    user_field = wait.until(EC.visibility_of_element_located((By.CLASS_NAME, 'username')))
+                    user_field.clear()
+                    user_field.send_keys(user_input)
+                    
+                    pass_field = driver.find_element(By.CLASS_NAME, 'password')
+                    pass_field.clear()
+                    pass_field.send_keys(pass_input)
+                    
+                    login_btn = driver.find_element(By.XPATH, '/html/body/app-root/login/div/div/div/tp-login/div/div/button')
+                    login_btn.click()
+                    
+                    # Verificar si entramos (esperar a que desaparezca el login o aparezca el menú)
+                    time.sleep(5)
+                    status.write("✅ Login completado.")
+                    
+                except Exception as e:
+                    st.error("Error durante el Login. Captura de pantalla de seguridad:")
+                    st.image(driver.get_screenshot_as_png())
+                    raise e
+
+                # --- PASO 2: BUCLE DE REFERENCIAS ---
                 for index, fila in df.iterrows():
                     ref = str(fila.get('REFERENCIA', '')).strip()
-                    status.write(f"Procesando: {ref} ({index + 1}/{len(df)})")
+                    status_text.text(f"Procesando: {ref} ({index+1}/{len(df)})")
                     
-                    verificar_spinner(driver, spinner_xpath)
-    
-                    # Click en el botón de buscar booking
-                    FindBookingButton = wait.until(
-                        EC.visibility_of_element_located((By.XPATH,'//*[@id="fastbookview"]/main/section/section/div/div[1]/ul/li/tp-button'))
-                    ).click()
-                    
-                    verificar_spinner(driver, spinner_xpath)
-                    
-                    # Llenar campos de búsqueda
-                    BookingRefFrom = driver.find_element(By.XPATH,'//*[@id="bookingreferencefrom"]/div/tp-validator/input')
-                    BookingRefFrom.clear()
-                    BookingRefFrom.send_keys(BookingRef)
-                    
-                    BookingRefTo = driver.find_element(By.XPATH,'//*[@id="bookingreferenceto"]/div/tp-validator/input')
-                    BookingRefTo.clear()
-                    BookingRefTo.send_keys(BookingRef)
-                    
-                    BookingSearch = driver.find_element(By.XPATH,'//*[@id="bookingsearchview"]/div[1]/div/div/div/tp-button[3]/button')
-                    BookingSearch.click()
+                    try:              
+                        verificar_spinner(driver, spinner_xpath)
+        
+                        # Click en el botón de buscar booking
+                        FindBookingButton = wait.until(
+                            EC.visibility_of_element_located((By.XPATH,'//*[@id="fastbookview"]/main/section/section/div/div[1]/ul/li/tp-button'))
+                        ).click()
+                        
+                        verificar_spinner(driver, spinner_xpath)
+                        
+                        # Llenar campos de búsqueda
+                        BookingRefFrom = driver.find_element(By.XPATH,'//*[@id="bookingreferencefrom"]/div/tp-validator/input')
+                        BookingRefFrom.clear()
+                        BookingRefFrom.send_keys(BookingRef)
+                        
+                        BookingRefTo = driver.find_element(By.XPATH,'//*[@id="bookingreferenceto"]/div/tp-validator/input')
+                        BookingRefTo.clear()
+                        BookingRefTo.send_keys(BookingRef)
+                        
+                        BookingSearch = driver.find_element(By.XPATH,'//*[@id="bookingsearchview"]/div[1]/div/div/div/tp-button[3]/button')
+                        BookingSearch.click()
 
-                    verificar_spinner(driver, spinner_xpath)
-                    
-                    try:
-                        SelectBooking = wait.until(
-                            EC.visibility_of_element_located((By.XPATH, '//*[@id="bookingSearchTabs-results"]/div/tp-grid/div/table/tbody/tr'))
-                        )
-                        SelectBooking.click()
-                    except TimeoutException:
-                        logging.warning(f"No se encontró el booking '{BookingRef}' en los resultados.")
-                        mensaje = f"El booking '{BookingRef}' NO existe.\n\n¿Es un GroupBook?"
-                        respuesta = alerta_booking_no_encontrado(mensaje)
-                        if respuesta:
-                            driver.refresh()
-                            continue
-                        else:
-                            continue
-
-                    verificar_spinner(driver, spinner_xpath)
-                    manejar_error_dialog(driver)
-                    
-                    # Abrir Menú y Notas (Se mantiene igual pero aplicado a 'fila')
-                    try:
-                        MenuBooking = wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="fastbookview"]/nav/tp-nav/div/div/div/div')))
-                        MenuBooking.click()
-                    except:
-                        pass
-
-                    # Selección de Booking Details y Notas
-                    # ... (Aquí va tu lógica de XPaths de booking_details y click en booking_notes) ...
-                    # (He omitido los XPaths repetidos por brevedad, mantén los que ya tienes en tu script)
-
-                    # Lógica para editar o crear nota PRE
-                    # ... (Mantén tu bloque try/except de celda_pre) ...
-
-                    # PREPARACIÓN DEL TEXTO (Usando la 'fila' actual de la iteración)
-                    orden_val = fila.get("ORDEN DE PAGO", "")
-                    orden_de_pago = "" if pd.isna(orden_val) else str(orden_val)
-
-                    fecha_val = fila.get("FECHA", "")
-                    fecha = fecha_val.strftime("%d/%m/%Y") if isinstance(fecha_val, pd.Timestamp) else str(fecha_val)
-
-                    numero_val = fila.get("IMPORTE", "")
-                    if pd.notna(numero_val):
+                        verificar_spinner(driver, spinner_xpath)
+                        
                         try:
-                            numero_val = int(numero_val) if float(numero_val).is_integer() else numero_val
-                        except: pass
-                    numero = str(numero_val)
+                            SelectBooking = wait.until(
+                                EC.visibility_of_element_located((By.XPATH, '//*[@id="bookingSearchTabs-results"]/div/tp-grid/div/table/tbody/tr'))
+                            )
+                            SelectBooking.click()
+                        except TimeoutException:
+                            logging.warning(f"No se encontró el booking '{BookingRef}' en los resultados.")
+                            mensaje = f"El booking '{BookingRef}' NO existe.\n\n¿Es un GroupBook?"
+                            respuesta = alerta_booking_no_encontrado(mensaje)
+                            if respuesta:
+                                driver.refresh()
+                                continue
+                            else:
+                                continue
 
-                    texto_final = f"{fecha}  {numero}  {orden_de_pago}"
+                        verificar_spinner(driver, spinner_xpath)
+                        manejar_error_dialog(driver)
+                        
+                        # Abrir Menú y Notas (Se mantiene igual pero aplicado a 'fila')
+                        try:
+                            MenuBooking = wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="fastbookview"]/nav/tp-nav/div/div/div/div')))
+                            MenuBooking.click()
+                        except:
+                            pass
 
-                    # Escribir en el IFRAME (Igual que tu código original)
-                    # ... (Bloque de iframe y ActionChains) ...
+                        # Selección de Booking Details y Notas
+                        # ... (Aquí va tu lógica de XPaths de booking_details y click en booking_notes) ...
+                        # (He omitido los XPaths repetidos por brevedad, mantén los que ya tienes en tu script)
 
-                    # Guardar y refrescar para la siguiente fila
-                    save_boton = wait.until(
-                        EC.element_to_be_clickable((By.XPATH,'/html/body/tp-dialog/dialog/tp-note-editor/div/div/div/div[1]/div/tp-button[5]/button'))
-                    ).click()
+                        # Lógica para editar o crear nota PRE
+                        # ... (Mantén tu bloque try/except de celda_pre) ...
 
-                    verificar_spinner(driver, spinner_xpath)
-                    driver.refresh()
-                    progreso = (index + 1) / len(df)
-                    progress_bar.progress(progreso)
+                        # PREPARACIÓN DEL TEXTO (Usando la 'fila' actual de la iteración)
+                        orden_val = fila.get("ORDEN DE PAGO", "")
+                        orden_de_pago = "" if pd.isna(orden_val) else str(orden_val)
+
+                        fecha_val = fila.get("FECHA", "")
+                        fecha = fecha_val.strftime("%d/%m/%Y") if isinstance(fecha_val, pd.Timestamp) else str(fecha_val)
+
+                        numero_val = fila.get("IMPORTE", "")
+                        if pd.notna(numero_val):
+                            try:
+                                numero_val = int(numero_val) if float(numero_val).is_integer() else numero_val
+                            except: pass
+                        numero = str(numero_val)
+
+                        texto_final = f"{fecha}  {numero}  {orden_de_pago}"
+
+                        # Escribir en el IFRAME (Igual que tu código original)
+                        # ... (Bloque de iframe y ActionChains) ...
+
+                        # Guardar y refrescar para la siguiente fila
+                        save_boton = wait.until(
+                            EC.element_to_be_clickable((By.XPATH,'/html/body/tp-dialog/dialog/tp-note-editor/div/div/div/div[1]/div/tp-button[5]/button'))
+                        ).click()
+
+                        verificar_spinner(driver, spinner_xpath)
+                        driver.refresh()
+                    reporte_final.append({"Referencia": ref, "Resultado": "✅ Procesado"})
+                    except Exception as e:
+                        reporte_final.append({"Referencia": ref, "Resultado": f"❌ Error: {str(e)}"})
+                    
+                    progress_bar.progress((index + 1) / len(df))
 
                 driver.quit()
-                status.update(label="✅ Proceso Finalizado", state="complete", expanded=False)
-                st.balloons()
-                st.success("Todas las referencias han sido procesadas.")
+                status.update(label="✅ Automatización Finalizada", state="complete")
+
+            # --- RESULTADOS ---
+            st.divider()
+            st.subheader("📊 Resumen de Ejecución")
+            st.dataframe(pd.DataFrame(reporte_final), use_container_width=True)
+            st.balloons()
 
         except Exception as e:
-            st.error(f"Ocurrió un error: {e}")
-            if 'driver' in locals(): driver.quit()
+            st.error(f"⚠️ El proceso se detuvo por un error crítico")
+            st.expander("Ver detalles técnicos").text(traceback.format_exc())
+            if 'driver' in locals():
+                st.image(driver.get_screenshot_as_png(), caption="Último estado del navegador")
+                driver.quit()

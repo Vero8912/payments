@@ -56,7 +56,7 @@ if st.button("🚀 Iniciar Proceso"):
                 
                 # --- LOGIN ---
                 status.write("Realizando login...")
-                driver.get('https://la-atpdmc.nx.tourplan.net/TourplanNX/#/home')
+                driver.get('https://la-atpdmc.nx.tourplan.net/TourplanNX_test/#/home')
                 
                 wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'username'))).send_keys(user_input)
                 driver.find_element(By.CLASS_NAME, 'password').send_keys(pass_input)

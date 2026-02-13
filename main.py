@@ -32,11 +32,11 @@ def iniciar_navegador():
     return driver
 
 # --- INTERFAZ DE STREAMLIT ---
-st.set_page_config(page_title="Tourplan Automation", page_icon="🤖")
-st.title("🤖 Tourplan Automation Web")
+st.set_page_config(page_title="Notas Pagos", page_icon="🤖")
+st.title("🤖 Notas de pagos Tourplan")
 
 with st.sidebar:
-    st.header("🔑 Credenciales")
+    st.header("🔑 Credenciales de Tourplan")
     user_input = st.text_input("Usuario")
     pass_input = st.text_input("Contraseña", type="password")
     
